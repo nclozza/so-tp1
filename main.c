@@ -27,8 +27,8 @@ int main(int argc, char **argv){
     createQueue();
     enqueue(argv[1]);
     dirp = opendir(argv[1]);
-    //printf("%s\n",argv[1]);
+    printf("%s\n",argv[1]);
     saveQueue(argv[1]);
-    //printQueue();
+    printQueue();
     return 0;
 }

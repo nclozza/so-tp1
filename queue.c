@@ -16,6 +16,7 @@ int isEmpty();
 void enqueue(char * data);
 char * dequeue();
 char* peek();
+int sizeQueue();
 
 struct queueElement
 {
@@ -34,7 +35,7 @@ void saveQueue(char * dir){
     struct stat file;
     char path[100];
     char * bar = "/";
-
+	
     if((directory = opendir(dir)) == NULL){
         printf("Could not open the directory: %s\n", dir);
     }
@@ -110,12 +111,14 @@ int isEmpty()
 	return queueSize==0;
 }
 
+int sizeQueue(){
+	return queueSize;
+}
 
 void printQueue(){
-
     struct queueElement *aux = queueFront;
     int i;
-    for(i=0; i<queueSize-1; i++){
+    while(aux->next != NULL){
         printf("%s\n",aux->filename);
         aux = aux->next;
     }
