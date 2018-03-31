@@ -42,8 +42,8 @@ void saveQueue(char * dir){
     while((dirEntry = readdir(directory)) != NULL){
         stat(dirEntry->d_name,&file);
         if (strcmp(dirEntry->d_name,".") != 0 && strcmp(dirEntry->d_name,"..") != 0){
-
-            char node[100];
+            char* node;
+			node = malloc((sizeof(char) * strlen(dir)) + (sizeof(char) * strlen(dirEntry->d_name)) + (sizeof(char)*2));
             strcpy(node,dir);
             strcat(node,bar);
             strcat(node,dirEntry->d_name);
