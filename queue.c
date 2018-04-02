@@ -9,6 +9,7 @@
 #include <stdbool.h>
 
 // Save all the files in a queue
+void createPathQueue(char * initialPath);
 void saveQueue(char* dir);
 void printQueue();
 void createQueue();
@@ -28,6 +29,12 @@ struct queueElement *queueFront;
 struct queueElement *queueLast;
 int queueSize;
 
+void createPathQueue(char * initialPath)
+{
+	createQueue();
+    enqueue(initialPath);
+    saveQueue(initialPath);
+}
 
 void saveQueue(char * dir){
     DIR * directory;
@@ -75,9 +82,9 @@ char* peek()
 
 char * dequeue()
 {
+	queueSize--;
 	if(isEmpty())
 		return NULL;
-	queueSize--;
 	struct queueElement *tmp = queueFront;
 	char * data = tmp->filename;
 	queueFront = queueFront->next;

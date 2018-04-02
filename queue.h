@@ -1,6 +1,7 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
+void createPathQueue(char * initialPath);
 void printQueue();
 void createQueue();
 int isEmpty();
