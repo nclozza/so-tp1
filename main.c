@@ -15,6 +15,10 @@
 #include "queue.h"
 #include "helpers.h"
 #include "hash.h"
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 
 #define CHILD_PROCESSES 2
 #define MD5_HASH_LENGTH 32
@@ -65,6 +69,7 @@ int main(int argc, char **argv)
 
         if (childsPID[i] == 0)
         {    
+          
             char* pathToHash;
             char pathToHashLength[4];
             int incomingPathLength;
@@ -98,16 +103,16 @@ int main(int argc, char **argv)
                 sprintf(hashLenghtString, "%03d", hashLength);
                 
                 hash(pathToHash, pathHashed);
-                printf("HASH LENGTH: %s\n", hashLenghtString);
-                printf("PATH HASHED: %s\n", pathHashed);
+               // printf("HASH LENGTH: %s\n", hashLenghtString);
+               // printf("PATH HASHED: %s\n", pathHashed);
                 pathHashedWithLength = concat(hashLenghtString, pathHashed);
-                printf("PATH HASHED WITH LENGTH: %s\n", pathHashedWithLength);
+               // printf("PATH HASHED WITH LENGTH: %s\n", pathHashedWithLength);
 
                 if(write(pipeChildsToMain[1], pathHashedWithLength, hashLength + 3) != hashLength + 3)
                 {
                    printf("Childe N°: %i. Error while writting to the father process\n", i); 
-                }
-            }
+                }                
+            }            
 
             //write(STDOUT_FILENO, "\n", 1);
             //close(pipeMainToChild[i][0]);
@@ -133,6 +138,10 @@ int main(int argc, char **argv)
     char pathHashed[256];
     char pathHashedLength[3];
     int incomingPathHashedLength;
+
+    fd_set set;
+    struct timeval tv;
+    int selectVal;    
 
     while(!allPathsToHashSended && totalElementsRemainingToHash > 0)
     {
@@ -166,6 +175,28 @@ int main(int argc, char **argv)
             printf("FILE HASHED FROM CHILD: %s\n", pathHashed);
 
         }
+       
+        FD_ZERO(&set);
+        FD_SET(pipeMainToChild[0][0], &set);
+        FD_SET(pipeMainToChild[1][0], &set);
+        tv.tv_sec = 2;
+        
+        selectVal = select(2, &set, NULL, NULL, &tv);
+
+        if (selectVal == -1)
+        {
+            printf("Se va todo a la puta que los pario\n");
+        }
+        else if (selectVal)
+        {
+            printf("Pipe disponible\n");
+        }
+        else
+        {
+            printf("Tu app es una mierda y tarda un monton\n");
+        }
+       
+        
     }
        
 
