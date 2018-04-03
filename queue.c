@@ -9,7 +9,6 @@
 #include <stdbool.h>
 
 // Save all the files in a queue
-void createPathQueue(char * initialPath);
 void saveQueue(char* dir);
 void printQueue();
 void createQueue();
@@ -49,7 +48,7 @@ void saveQueue(char * dir){
 
     while((dirEntry = readdir(directory)) != NULL){
         stat(dirEntry->d_name,&file);
-        if (strcmp(dirEntry->d_name,".") != 0 && strcmp(dirEntry->d_name,"..") != 0){
+        if (dirEntry->d_type != 4 && strcmp(dirEntry->d_name,".") != 0 && strcmp(dirEntry->d_name,"..") != 0){
             char* node;
 			node = malloc((sizeof(char) * strlen(dir)) + (sizeof(char) * strlen(dirEntry->d_name)) + (sizeof(char)*2));
             strcpy(node,dir);
@@ -82,9 +81,9 @@ char* peek()
 
 char * dequeue()
 {
-	queueSize--;
 	if(isEmpty())
 		return NULL;
+	queueSize--;
 	struct queueElement *tmp = queueFront;
 	char * data = tmp->filename;
 	queueFront = queueFront->next;

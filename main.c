@@ -8,13 +8,19 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <sys/wait.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 #include <unistd.h>
 #include <signal.h>
 #include "queue.h"
+#include "helpers.h"
+#include "hash.h"
 
 #define CHILD_PROCESSES 2
+#define MD5_HASH_LENGTH 32
 
-int main(int argc, char **argv){
+int main(int argc, char **argv)
+{
 
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <PATH>\n", argv[0]);
@@ -29,17 +35,22 @@ int main(int argc, char **argv){
     }
 
     createPathQueue(argv[1]);
-    //printQueue();
 
     int pipeMainToChild[CHILD_PROCESSES][2];
-    int pipeChildToMain[CHILD_PROCESSES][2];
+    int pipeChildsToMain[2];
     pid_t childsPID[CHILD_PROCESSES];
-    char pathToHash[128];
+    
     int i;
+
+    if(pipe(pipeChildsToMain) == -1)
+    {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
 
     for(i = 0; i < CHILD_PROCESSES; i++)
     {
-        if (pipe(pipeMainToChild[i]) == -1 || pipe(pipeChildToMain[i]) == -1)
+        if (pipe(pipeMainToChild[i]) == -1)
         {
             perror("pipe");
             exit(EXIT_FAILURE);
@@ -54,20 +65,44 @@ int main(int argc, char **argv){
 
         if (childsPID[i] == 0)
         {    
+            char* pathToHash;
+            char pathToHashLength[4];
+            int incomingPathLength;
+
             /* Close unused write end */
             close(pipeMainToChild[i][1]);
             /* Close unused read end */
-            close(pipeChildToMain[i][0]);
-
+            close(pipeChildsToMain[0]);
 
             /*Wait for other paths*/
-            printf("Child number: %d", i);
             while(1)
             {
                 /* Child reads from pipe */
-                read(pipeMainToChild[i][0], pathToHash, 128);
-                printf("%s\n", pathToHash);
-                //write(STDOUT_FILENO, pathToHash, 1);
+                read(pipeMainToChild[i][0], pathToHashLength, 4);
+                
+                if(str2int(&incomingPathLength, pathToHashLength) != STR2INT_SUCCESS)
+                {
+                    printf("Error while converting char* to int in child N°: %i\n", i);
+                }
+
+                pathToHash = malloc(incomingPathLength);
+                read(pipeMainToChild[i][0], pathToHash, incomingPathLength);
+
+                char* pathHashed;
+                char* pathHashedWithLength;
+                char hashLenghtString[4];
+                int hashLength = MD5_HASH_LENGTH + 2 + incomingPathLength;
+                pathHashed = malloc(hashLength);
+                pathHashedWithLength = malloc(3 + hashLength);
+                sprintf(hashLenghtString, "%03d", hashLength);
+                
+                hash(pathToHash, pathHashed);
+                pathHashedWithLength = concat(hashLenghtString, pathHashed);
+
+                if(write(pipeChildsToMain[1], pathHashedWithLength, hashLength + 3) != hashLength + 3)
+                {
+                   printf("Childe N°: %i. Error while writting to the father process\n", i); 
+                }
             }
 
             //write(STDOUT_FILENO, "\n", 1);
@@ -80,32 +115,57 @@ int main(int argc, char **argv){
             /* Close unused read end */
             close(pipeMainToChild[i][0]);
             /* Close unused write end */
-            close(pipeChildToMain[i][1]);
-
-            //write(pipeMainToChild[i][1], argv[1], strlen(argv[1]));
-
-            /* Parent writes argv[1] to pipe */
-            //write(pipeMainToChild[i][1], argv[1], strlen(argv[1]));
-            /* Reader will see EOF */
-            //close(pipeMainToChild[i][1]);
-            /* Wait for child */
-            //wait(NULL);
-            //exit(EXIT_SUCCESS);
+            close(pipeChildsToMain[1]);
         }
     }
 
-    char* element;
-    int elementLenght;
-    while((element = dequeue()) != NULL)
+    char* path;
+    int pathLength;
+    char pathLengthString[4];
+    int allPathsToHashSended = 0;
+    int allPathsHashedReceived = 0;
+    int totalElementsRemainingToHash = sizeQueue();
+    int hashesReceived = 0;
+    char pathHashed[256];
+    char pathHashedLength[3];
+    int incomingPathHashedLength;
+
+    while(!allPathsToHashSended && totalElementsRemainingToHash > 0)
     {
-        elementLenght = strlen(element);
-        if(write(pipeMainToChild[0][1], element, elementLenght) != elementLenght)
+        if((path = dequeue()) == NULL)
         {
-            printf("Error while writting to a child process");
+            allPathsToHashSended = 1;
+        }
+        else
+        {
+            pathLength = strlen(path) + 1;
+            sprintf(pathLengthString, "%d", pathLength);
+            
+            if(write(pipeMainToChild[0][1], pathLengthString, 4) != 4)
+            {
+                printf("Error while writting to a child process\n");
+            }
+            
+            if(write(pipeMainToChild[0][1], path, pathLength) != pathLength)
+            {
+                printf("Error while writting to a child process\n");
+            }
+        }
+ 
+        if(read(pipeChildsToMain[0], pathHashedLength, 3) == 3)
+        {
+            totalElementsRemainingToHash--;
+            str2int(&incomingPathHashedLength, pathHashedLength);
+
+            read(pipeChildsToMain[0], pathHashed, incomingPathHashedLength - 1);
+            fflush(stdout);
+            printf("FILE HASHED FROM CHILD: %s\n", pathHashed);
+
         }
     }
+       
 
-    sleep(5);
+    sleep(1);
     printf("\n");
     for(i = 0; i < CHILD_PROCESSES; i++)
     {

@@ -3,6 +3,7 @@
 
 char* hash(char* stringToHash, char* result);
 
+/*
 int nextFilename(char* batchToHash, char* stringSpace, int index)
 {
 	int j = 0;
@@ -30,15 +31,18 @@ int processBatch(char* batchToHash, int batchSize)
 	}
 	return 0;
 }
+*/
 
 char* hash(char* stringToHash, char* result)
 {
 	char command[256];
-	sprintf(command,"md5sum %s",stringToHash);
-	FILE * hashedFile = popen(command,"r");
+	sprintf(command, "md5sum %s", stringToHash);
+	FILE* hashedFile = popen(command,"r");
 	if(hashedFile == NULL)
-		return NULL;	
-	char * hashedString = fgets(result,512,hashedFile); 
+		return NULL;
+	
+	char* hashedString = fgets(result, 512, hashedFile); 
 	pclose(hashedFile);
+
 	return hashedString;
 }
