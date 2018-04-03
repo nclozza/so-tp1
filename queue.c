@@ -28,6 +28,12 @@ struct queueElement *queueFront;
 struct queueElement *queueLast;
 int queueSize;
 
+void createPathQueue(char * initialPath)
+{
+	createQueue();
+    enqueue(initialPath);
+    saveQueue(initialPath);
+}
 
 void saveQueue(char * dir){
     DIR * directory;
@@ -42,7 +48,7 @@ void saveQueue(char * dir){
 
     while((dirEntry = readdir(directory)) != NULL){
         stat(dirEntry->d_name,&file);
-        if (strcmp(dirEntry->d_name,".") != 0 && strcmp(dirEntry->d_name,"..") != 0){
+        if (dirEntry->d_type != 4 && strcmp(dirEntry->d_name,".") != 0 && strcmp(dirEntry->d_name,"..") != 0){
             char* node;
 			node = malloc((sizeof(char) * strlen(dir)) + (sizeof(char) * strlen(dirEntry->d_name)) + (sizeof(char)*2));
             strcpy(node,dir);
