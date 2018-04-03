@@ -85,19 +85,23 @@ int main(int argc, char **argv)
                     printf("Error while converting char* to int in child N°: %i\n", i);
                 }
 
-                pathToHash = malloc(incomingPathLength);
+                pathToHash = malloc(incomingPathLength + 1);
                 read(pipeMainToChild[i][0], pathToHash, incomingPathLength);
 
                 char* pathHashed;
                 char* pathHashedWithLength;
                 char hashLenghtString[4];
                 int hashLength = MD5_HASH_LENGTH + 2 + incomingPathLength;
+                
                 pathHashed = malloc(hashLength);
                 pathHashedWithLength = malloc(3 + hashLength);
                 sprintf(hashLenghtString, "%03d", hashLength);
                 
                 hash(pathToHash, pathHashed);
+                printf("HASH LENGTH: %s\n", hashLenghtString);
+                printf("PATH HASHED: %s\n", pathHashed);
                 pathHashedWithLength = concat(hashLenghtString, pathHashed);
+                printf("PATH HASHED WITH LENGTH: %s\n", pathHashedWithLength);
 
                 if(write(pipeChildsToMain[1], pathHashedWithLength, hashLength + 3) != hashLength + 3)
                 {
