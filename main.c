@@ -1,25 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <string.h>
-#include <dirent.h>
 #include <errno.h>
-#include <limits.h>
-#include <stdbool.h>
 #include <sys/wait.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <unistd.h>
-#include <signal.h>
 #include "queue.h"
 #include "helpers.h"
 #include "hash.h"
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
-
+#include <sys/mman.h>
 #include <mqueue.h>
+#include <sys/stat.h>
 
 #define CHILD_PROCESSES 2
 #define MSG_SIZE 256
@@ -46,16 +36,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // MESSAGE QUEUE
+    struct mq_attr attr, old_attr;
+    mqd_t mqSendPaths, mqReceiveHashes;
 
-    struct mq_attr attr, old_attr;   // To store queue attributes
-    mqd_t mqSendPaths, mqReceiveHashes;             // Message queue descriptors
-
-    // First we need to set up the attribute structure
     attr.mq_maxmsg = 10;
     attr.mq_msgsize = MSG_SIZE;
     attr.mq_flags = O_NONBLOCK;
 
-    // Open a queue with the attribute structure
     mqSendPaths = mq_open(MQ_SEND_PATHS, O_WRONLY | O_NONBLOCK | O_CREAT, 0666, &attr);
     if(mqSendPaths == -1)
     {
@@ -73,6 +61,32 @@ int main(int argc, char **argv)
             perror ("mq_send()");
     }
 
+    // SHARED MEMORY
+
+    /* the size (in bytes) of shared memory object */
+    const int SIZE = 4096;
+ 
+    /* name of the shared memory object */
+    // LU/CONY/FEDE CAMBIAR ESTE NOMBRE
+    const char* name = "OS";
+ 
+    /* shared memory file descriptor */
+    int shm_fd;
+ 
+    /* pointer to shared memory obect */    
+    void* ptr;
+ 
+    /* create the shared memory object */
+    shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
+ 
+    /* configure the size of the shared memory object */
+    ftruncate(shm_fd, SIZE);
+ 
+    /* memory map the shared memory object */
+    ptr = mmap(0, SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+
+
+    // CHILDRENS
     pid_t childsPID[CHILD_PROCESSES];
     int i;
 
@@ -87,6 +101,7 @@ int main(int argc, char **argv)
 
         if (childsPID[i] == 0)
         {
+            /* CHILDRENS */
             mqSendPaths = mq_open(MQ_SEND_PATHS, O_RDONLY | O_NONBLOCK | O_CREAT, 0666);
             if(mqSendPaths == -1)
             {
@@ -126,43 +141,52 @@ int main(int argc, char **argv)
         }
         else
         {
+            /* FATHER */
+
+            mqReceiveHashes = mq_open(MQ_RECEIVE_HASHES, O_RDONLY | O_CREAT, 0666, &attr);
+            if(mqReceiveHashes == -1)
+            {
+                printf("Error opening the Message Queue descriptor\n");
+            }
+            
+            char hashReceived[MSG_SIZE];
+            int mqReceiveHashesQueueEmpty = 0;
+
+            do
+            {
+                mq_receive(mqReceiveHashes, hashReceived, MSG_SIZE, NULL);
+                if(errno == EAGAIN)
+                {
+                    mqReceiveHashesQueueEmpty = 1;
+                }
+                else
+                {
+                    // LU/CONY/FEDE ACA ESTSA GUARDANDO EN LA SHARED MEMORY, ACORDARSE EL TEMA DEL SEMAFORO PARA QUE VIEW NO EJECUTE
+                    printf("%s\n", hashReceived);
+                    sprintf(ptr, "%s", hashReceived);
+                    strcat(ptr, "\n");
+                    ptr += strlen(hashReceived);
+                }
+                totalPaths--;
+            } while(!mqReceiveHashesQueueEmpty && totalPaths);
+
+            // LU/CONY/FEDE ESTO ES SIMPLEMENTE A MODO DE ESPERA PARA QUE TE DE TIEMPO A EJECUTAR EL VIEW
+            printf("Run the view process\n");
+            sleep(10);
+
+            int storage;
+            for(i = 0; i < CHILD_PROCESSES; i++)
+            {
+                waitpid(childsPID[i], &storage, WUNTRACED);
+            }
+
+            mq_close(mqReceiveHashes);
+            mq_unlink(MQ_RECEIVE_HASHES);
+            mq_close(mqSendPaths);
+            mq_unlink(MQ_SEND_PATHS);
+            shm_unlink(name);
         }
     }
-
-
-    mqReceiveHashes = mq_open(MQ_RECEIVE_HASHES, O_RDONLY | O_CREAT, 0666, &attr);
-    if(mqReceiveHashes == -1)
-    {
-        printf("Error opening the Message Queue descriptor\n");
-    }
-    
-    char hashReceived[MSG_SIZE];
-    int mqReceiveHashesQueueEmpty = 0;
-
-    do
-    {
-        mq_receive(mqReceiveHashes, hashReceived, MSG_SIZE, NULL);
-        if(errno == EAGAIN)
-        {
-            mqReceiveHashesQueueEmpty = 1;
-        }
-        else
-        {
-            printf("%s\n", hashReceived);
-        }
-        totalPaths--;
-    } while(!mqReceiveHashesQueueEmpty && totalPaths);
-
-    int storage;
-    for(i = 0; i < CHILD_PROCESSES; i++)
-    {
-        waitpid(childsPID[i], &storage, WUNTRACED);
-    }
-
-    mq_close(mqReceiveHashes);
-    mq_unlink(MQ_RECEIVE_HASHES);
-    mq_close(mqSendPaths);
-    mq_unlink(MQ_SEND_PATHS);
 
     return 0;
 }
