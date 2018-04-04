@@ -39,6 +39,6 @@ char * format(char* hashedString)
 		k++;
 	}
 	filename[k] = '\0';	
-	sprintf(formatedString,"<%s> : <%s>",filename,hash);
+	sprintf(formatedString,"<%s> : <%s>\n",filename,hash);
 	return formatedString;
 }

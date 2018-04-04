@@ -179,8 +179,7 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    int hashReceivedLength = strlen(hashReceived);
-                    printf("%s\n",hashReceived );
+                    int hashReceivedLength = strlen(hashReceived);                    
                     strcat(internalBuffer, hashReceived);
                     strcat(internalBuffer, "\n");
                     sprintf(ptr, "%s", hashReceived);
