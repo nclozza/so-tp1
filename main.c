@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     }
 
     // MESSAGE QUEUE
-    struct mq_attr attr, old_attr;
+    struct mq_attr attr;
     mqd_t mqSendPaths, mqReceiveHashes;
 
     attr.mq_maxmsg = 10;

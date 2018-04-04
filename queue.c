@@ -128,7 +128,6 @@ int sizeQueue()
 void printQueue()
 {
     struct queueElement *aux = queueFront;
-    int i;
     while(aux->next != NULL){
         printf("%s\n",aux->filename);
         aux = aux->next;
