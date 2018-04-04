@@ -3,13 +3,14 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/wait.h>
-#include "queue.h"
-#include "helpers.h"
-#include "hash.h"
 #include <unistd.h>
 #include <sys/mman.h>
 #include <mqueue.h>
 #include <sys/stat.h>
+#include "queue.h"
+#include "helpers.h"
+#include "hash.h"
+#include "appendStringToFile.h"
 
 #define CHILD_PROCESSES 2
 #define MSG_SIZE 256
@@ -64,7 +65,7 @@ int main(int argc, char **argv)
     // SHARED MEMORY
 
     /* the size (in bytes) of shared memory object */
-    const int SIZE = 4096;
+    const int sharedMemorySize = 4096;
  
     /* name of the shared memory object */
     // LU/CONY/FEDE CAMBIAR ESTE NOMBRE
@@ -80,10 +81,10 @@ int main(int argc, char **argv)
     shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
  
     /* configure the size of the shared memory object */
-    ftruncate(shm_fd, SIZE);
+    ftruncate(shm_fd, sharedMemorySize);
  
     /* memory map the shared memory object */
-    ptr = mmap(0, SIZE, PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    ptr = mmap(0, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
 
     // CHILDRENS
@@ -143,6 +144,7 @@ int main(int argc, char **argv)
         {
             /* FATHER */
 
+            char internalBuffer[MSG_SIZE * 10];
             mqReceiveHashes = mq_open(MQ_RECEIVE_HASHES, O_RDONLY | O_CREAT, 0666, &attr);
             if(mqReceiveHashes == -1)
             {
@@ -161,11 +163,16 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    // LU/CONY/FEDE ACA ESTSA GUARDANDO EN LA SHARED MEMORY, ACORDARSE EL TEMA DEL SEMAFORO PARA QUE VIEW NO EJECUTE
+                    // LU/CONY/FEDE IMPRIMO SIMPLEMENTE POR AMOR AL ARTE EL HASH QUE RECIBI
                     printf("%s\n", hashReceived);
+                    int hashReceivedLength = strlen(hashReceived);
+                    // LU/CONY/FEDE ACA ESTA GUARDANDO EN UN BUFFER INTERNO PARA DESPUES VOLCARLO A MEMORIA, INTENTAR HACERLO DINAMICO
+                    strcat(internalBuffer, hashReceived);
+                    strcat(internalBuffer, "\n");
+                    // LU/CONY/FEDE ACA ESTA GUARDANDO EN LA SHARED MEMORY, ACORDARSE EL TEMA DEL SEMAFORO PARA QUE VIEW NO EJECUTE
                     sprintf(ptr, "%s", hashReceived);
                     strcat(ptr, "\n");
-                    ptr += strlen(hashReceived);
+                    ptr += hashReceivedLength;
                 }
                 totalPaths--;
             } while(!mqReceiveHashesQueueEmpty && totalPaths);
@@ -173,6 +180,11 @@ int main(int argc, char **argv)
             // LU/CONY/FEDE ESTO ES SIMPLEMENTE A MODO DE ESPERA PARA QUE TE DE TIEMPO A EJECUTAR EL VIEW
             printf("Run the view process\n");
             sleep(10);
+
+            if(appendStringToFile(internalBuffer) == 0)
+            {
+                perror("Error while writing the hashes in the file hashes.txt");
+            }
 
             int storage;
             for(i = 0; i < CHILD_PROCESSES; i++)
