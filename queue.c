@@ -35,7 +35,8 @@ void createPathQueue(char * initialPath)
     saveQueue(initialPath);
 }
 
-void saveQueue(char * dir){
+void saveQueue(char * dir)
+{
     DIR * directory;
     struct dirent * dirEntry;
     struct stat file;
@@ -119,11 +120,13 @@ int isEmpty()
 	return queueSize==0;
 }
 
-int sizeQueue(){
+int sizeQueue()
+{
 	return queueSize;
 }
 
-void printQueue(){
+void printQueue()
+{
     struct queueElement *aux = queueFront;
     int i;
     while(aux->next != NULL){
