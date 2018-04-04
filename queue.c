@@ -99,6 +99,7 @@ void enqueue(char * data)
 		queueFront = (struct queueElement *)malloc(sizeof(struct queueElement));
 		queueFront->filename = malloc(strlen(data)+1);
 		strcpy(queueFront->filename,data);
+		queueFront->filename[strlen(data) + 1] = '\0';
 		queueFront->next = NULL;
 		queueLast = queueFront;
 	}
@@ -107,6 +108,7 @@ void enqueue(char * data)
 		queueLast->next = (struct queueElement *)malloc(sizeof(struct queueElement));
 		queueLast->filename = malloc(strlen(data)+1);
 		strcpy(queueLast->filename,data);
+		queueLast->filename[strlen(data) + 1] = '\0';
 		queueLast->next->next = NULL;
 		queueLast = queueLast->next;
 	}	

@@ -19,13 +19,21 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <mqueue.h>
 
 #define CHILD_PROCESSES 2
-#define MD5_HASH_LENGTH 32
+#define MSG_SIZE 256
+#define MQ_SEND_PATHS "/mqSendPaths"
+#define MQ_RECEIVE_HASHES "/mqReceiveHashes"
+
+struct mesg_buffer {
+    long mesg_type;
+    char mesg_text[1024];
+    int count;
+} message;
 
 int main(int argc, char **argv)
 {
-
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <PATH>\n", argv[0]);
         exit(EXIT_FAILURE);
@@ -33,33 +41,43 @@ int main(int argc, char **argv)
 
     struct stat fileStat;
 
-    if(stat(argv[1],&fileStat) < 0) {
-        return 1;
+    if(stat(argv[1], &fileStat) < 0) {
         printf("Error in the file\n");
+        return 1;
     }
 
-    createPathQueue(argv[1]);
 
-    int pipeMainToChild[CHILD_PROCESSES][2];
-    int pipeChildsToMain[2];
-    pid_t childsPID[CHILD_PROCESSES];
-    
-    int i;
+    struct mq_attr attr, old_attr;   // To store queue attributes
+    mqd_t mqSendPaths, mqReceiveHashes;             // Message queue descriptors
 
-    if(pipe(pipeChildsToMain) == -1)
+    // First we need to set up the attribute structure
+    attr.mq_maxmsg = 10;
+    attr.mq_msgsize = MSG_SIZE;
+    attr.mq_flags = O_NONBLOCK;
+
+    // Open a queue with the attribute structure
+    mqSendPaths = mq_open(MQ_SEND_PATHS, O_WRONLY | O_NONBLOCK | O_CREAT, 0666, &attr);
+    if(mqSendPaths == -1)
     {
-        perror("pipe");
-        exit(EXIT_FAILURE);
+        printf("Error opening the Message Queue descriptor\n");
     }
+    
+    createPathQueue(argv[1]);
+    int totalPaths = sizeQueue() - 1;
+    char* pathFromQueue;
+    
+    while((pathFromQueue = dequeue()) != NULL)
+    {
+        int result = mq_send(mqSendPaths, pathFromQueue, MSG_SIZE, 0);
+        if (result == -1)
+            perror ("mq_send()");
+    }
+
+    pid_t childsPID[CHILD_PROCESSES];
+    int i;
 
     for(i = 0; i < CHILD_PROCESSES; i++)
     {
-        if (pipe(pipeMainToChild[i]) == -1)
-        {
-            perror("pipe");
-            exit(EXIT_FAILURE);
-        }
-
         childsPID[i] = fork();
         if (childsPID[i] == -1)
         {
@@ -68,146 +86,82 @@ int main(int argc, char **argv)
         }
 
         if (childsPID[i] == 0)
-        {    
-          
-            char* pathToHash;
-            char pathToHashLength[4];
-            int incomingPathLength;
-
-            /* Close unused write end */
-            close(pipeMainToChild[i][1]);
-            /* Close unused read end */
-            close(pipeChildsToMain[0]);
-
-            /*Wait for other paths*/
-            while(1)
+        {
+            mqSendPaths = mq_open(MQ_SEND_PATHS, O_RDONLY | O_NONBLOCK | O_CREAT, 0666);
+            if(mqSendPaths == -1)
             {
-                /* Child reads from pipe */
-                read(pipeMainToChild[i][0], pathToHashLength, 4);
-                
-                if(str2int(&incomingPathLength, pathToHashLength) != STR2INT_SUCCESS)
+                printf("Error opening the Message Queue descriptor\n");
+            }
+
+            mqReceiveHashes = mq_open(MQ_RECEIVE_HASHES, O_WRONLY | O_NONBLOCK | O_CREAT, 0666, &attr);
+            if(mqReceiveHashes == -1)
+            {
+                printf("Error opening the Message Queue descriptor\n");
+            }
+            
+            char buf[MSG_SIZE];
+            int queueIsEmpty = 0;
+
+            do
+            {
+                mq_receive(mqSendPaths, buf, MSG_SIZE, NULL);
+                if(errno == EAGAIN)
                 {
-                    printf("Error while converting char* to int in child N°: %i\n", i);
+                    queueIsEmpty = 1;
                 }
-
-                pathToHash = malloc(incomingPathLength + 1);
-                read(pipeMainToChild[i][0], pathToHash, incomingPathLength);
-
-                char* pathHashed;
-                char* pathHashedWithLength;
-                char hashLenghtString[4];
-                int hashLength = MD5_HASH_LENGTH + 2 + incomingPathLength;
-                
-                pathHashed = malloc(hashLength);
-                pathHashedWithLength = malloc(3 + hashLength);
-                sprintf(hashLenghtString, "%03d", hashLength);
-                
-                hash(pathToHash, pathHashed);
-               // printf("HASH LENGTH: %s\n", hashLenghtString);
-               // printf("PATH HASHED: %s\n", pathHashed);
-                pathHashedWithLength = concat(hashLenghtString, pathHashed);
-               // printf("PATH HASHED WITH LENGTH: %s\n", pathHashedWithLength);
-
-                if(write(pipeChildsToMain[1], pathHashedWithLength, hashLength + 3) != hashLength + 3)
+                else
                 {
-                   printf("Childe N°: %i. Error while writting to the father process\n", i); 
-                }                
-            }            
+                    printf("Recibiendo %s\n", buf);
+                    int result = mq_send(mqReceiveHashes, buf, MSG_SIZE, 0);
+                    if (result == -1)
+                        perror ("mq_send()");
+                }
+            } while(!queueIsEmpty);
 
-            //write(STDOUT_FILENO, "\n", 1);
-            //close(pipeMainToChild[i][0]);
-            //_exit(EXIT_SUCCESS);
+            mq_close(mqReceiveHashes);
+            mq_close(mqSendPaths);
+            _exit(EXIT_SUCCESS);
 
         }
         else
         {
-            /* Close unused read end */
-            close(pipeMainToChild[i][0]);
-            /* Close unused write end */
-            close(pipeChildsToMain[1]);
         }
     }
 
-    char* path;
-    int pathLength;
-    char pathLengthString[4];
-    int allPathsToHashSended = 0;
-    int allPathsHashedReceived = 0;
-    int totalElementsRemainingToHash = sizeQueue();
-    int hashesReceived = 0;
-    char pathHashed[256];
-    char pathHashedLength[3];
-    int incomingPathHashedLength;
 
-    fd_set set;
-    struct timeval tv;
-    int selectVal;    
-
-    while(!allPathsToHashSended && totalElementsRemainingToHash > 0)
+    mqReceiveHashes = mq_open(MQ_RECEIVE_HASHES, O_RDONLY | O_CREAT, 0666, &attr);
+    if(mqReceiveHashes == -1)
     {
-        if((path = dequeue()) == NULL)
-        {
-            allPathsToHashSended = 1;
-        }
-        else
-        {
-            pathLength = strlen(path) + 1;
-            sprintf(pathLengthString, "%d", pathLength);
-            
-            if(write(pipeMainToChild[0][1], pathLengthString, 4) != 4)
-            {
-                printf("Error while writting to a child process\n");
-            }
-            
-            if(write(pipeMainToChild[0][1], path, pathLength) != pathLength)
-            {
-                printf("Error while writting to a child process\n");
-            }
-        }
- 
-        if(read(pipeChildsToMain[0], pathHashedLength, 3) == 3)
-        {
-            totalElementsRemainingToHash--;
-            str2int(&incomingPathHashedLength, pathHashedLength);
-
-            read(pipeChildsToMain[0], pathHashed, incomingPathHashedLength - 1);
-            fflush(stdout);
-            printf("FILE HASHED FROM CHILD: %s\n", pathHashed);
-
-        }
-       
-        FD_ZERO(&set);
-        FD_SET(pipeMainToChild[0][0], &set);
-        FD_SET(pipeMainToChild[1][0], &set);
-        tv.tv_sec = 2;
-        
-        selectVal = select(2, &set, NULL, NULL, &tv);
-
-        if (selectVal == -1)
-        {
-            printf("Se va todo a la puta que los pario\n");
-        }
-        else if (selectVal)
-        {
-            printf("Pipe disponible\n");
-        }
-        else
-        {
-            printf("Tu app es una mierda y tarda un monton\n");
-        }
-       
-        
+        printf("Error opening the Message Queue descriptor\n");
     }
-       
+    
+    char hashReceived[MSG_SIZE];
+    int mqReceiveHashesQueueEmpty = 0;
 
-    sleep(1);
-    printf("\n");
+    do
+    {
+        mq_receive(mqReceiveHashes, hashReceived, MSG_SIZE, NULL);
+        if(errno == EAGAIN)
+        {
+            mqReceiveHashesQueueEmpty = 1;
+        }
+        else
+        {
+            printf("PADRE %s\n", hashReceived);
+        }
+        totalPaths--;
+    } while(!mqReceiveHashesQueueEmpty && totalPaths);
+
+    int storage;
     for(i = 0; i < CHILD_PROCESSES; i++)
     {
-        close(pipeMainToChild[i][0]);
-        printf("KILL PID: %i\n", childsPID[i]);
-        kill(childsPID[i], SIGKILL);
+        waitpid(childsPID[i], &storage, WUNTRACED);
     }
+
+    mq_close(mqReceiveHashes);
+    mq_unlink(MQ_RECEIVE_HASHES);
+    mq_close(mqSendPaths);
+    mq_unlink(MQ_SEND_PATHS);
 
     return 0;
 }
