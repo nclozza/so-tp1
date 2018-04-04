@@ -11,6 +11,8 @@
 #include "helpers.h"
 #include "hash.h"
 #include "appendStringToFile.h"
+#include <time.h>
+#include <semaphore.h>
 
 #define CHILD_PROCESSES 2
 #define MSG_SIZE 256
@@ -86,6 +88,20 @@ int main(int argc, char **argv)
     /* memory map the shared memory object */
     ptr = mmap(0, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
+    char viewReadName[64], viewEndName[64];
+    sem_t *viewRead, *viewEnd;
+
+    sprintf(viewReadName,"/viewRead%d",getpid());
+    sprintf(viewEndName,"/viewEnd%d",getpid());
+
+    viewRead = sem_open(viewReadName, O_CREAT | O_EXCL, 0777, 0);
+    viewEnd = sem_open(viewEndName, O_CREAT | O_EXCL, 0777, 0);
+
+    if(viewRead == SEM_FAILED || viewEnd == SEM_FAILED)
+    {
+        perror("Error opening semaphore");
+        return -1;
+    }
 
     // CHILDRENS
     pid_t childsPID[CHILD_PROCESSES];
@@ -163,24 +179,32 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    // LU/CONY/FEDE IMPRIMO SIMPLEMENTE POR AMOR AL ARTE EL HASH QUE RECIBI
-                    printf("%s\n", hashReceived);
                     int hashReceivedLength = strlen(hashReceived);
-                    // LU/CONY/FEDE ACA ESTA GUARDANDO EN UN BUFFER INTERNO PARA DESPUES VOLCARLO A MEMORIA, INTENTAR HACERLO DINAMICO
+                    printf("%s\n",hashReceived );
                     strcat(internalBuffer, hashReceived);
                     strcat(internalBuffer, "\n");
-                    // LU/CONY/FEDE ACA ESTA GUARDANDO EN LA SHARED MEMORY, ACORDARSE EL TEMA DEL SEMAFORO PARA QUE VIEW NO EJECUTE
                     sprintf(ptr, "%s", hashReceived);
                     strcat(ptr, "\n");
                     ptr += hashReceivedLength;
+                    sem_post(viewRead);
                 }
                 totalPaths--;
             } while(!mqReceiveHashesQueueEmpty && totalPaths);
 
-            // LU/CONY/FEDE ESTO ES SIMPLEMENTE A MODO DE ESPERA PARA QUE TE DE TIEMPO A EJECUTAR EL VIEW
-            printf("Run the view process\n");
-            sleep(10);
-
+            strcat(ptr,"E");
+            printf("My pid is %d\n",getpid());
+            printf("Run the view process: Usage ./view PID\n");
+            
+            struct timespec ts;
+            if(clock_gettime(CLOCK_REALTIME, &ts) != -1)
+            {
+                ts.tv_sec += 15;
+                sem_timedwait(viewEnd,&ts);
+            }
+            else
+            {
+                sleep(10);
+            }
             if(appendStringToFile(internalBuffer) == 0)
             {
                 perror("Error while writing the hashes in the file hashes.txt");
@@ -197,6 +221,10 @@ int main(int argc, char **argv)
             mq_close(mqSendPaths);
             mq_unlink(MQ_SEND_PATHS);
             shm_unlink(name);
+            sem_close(viewRead);
+            sem_unlink(viewReadName);
+            sem_close(viewEnd);
+            sem_unlink(viewEndName);
         }
     }
 
