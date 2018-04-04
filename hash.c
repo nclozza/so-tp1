@@ -1,37 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
-char* hash(char* stringToHash, char* result);
-
-/*
-int nextFilename(char* batchToHash, char* stringSpace, int index)
-{
-	int j = 0;
-	while(batchToHash[index] != '\n' && batchToHash[index] != '0')
-	{
-		stringSpace[j] = batchToHash[index];
-		j++;
-		index++;
-	}
-	index++;
-	return index;
-}
-
-int processBatch(char* batchToHash, int batchSize)
-{
-	if(batchToHash==NULL)
-		return -1;
-	int i = 0;
-	char* currentFile = malloc(256);
-	for(int j = 0; j < batchSize; j++)
-	{
-		i = nextFilename(batchToHash,currentFile,i);
-		char result[512];	
-		//sendToApp(hash(currentFile, result));
-	}
-	return 0;
-}
-*/
+void format(char* hashedString, char* result);
 
 char* hash(char* stringToHash, char* result)
 {
@@ -40,9 +11,35 @@ char* hash(char* stringToHash, char* result)
 	FILE* hashedFile = popen(command,"r");
 	if(hashedFile == NULL)
 		return NULL;
-	
+
 	char* hashedString = fgets(result, 512, hashedFile); 
 	pclose(hashedFile);
-
+	format(hashedString,result);
+	
 	return hashedString;
+}
+
+void format(char* hashedString,char* result)
+{
+	
+	char filename[512], hash[512];
+	int i = 0, j = 0, k = 0;	
+	while(hashedString[i] != ' ')
+	{
+		hash[j] = hashedString[i];
+		j++;
+		i++;
+	}
+	hash[j] = '\0';
+	i++;
+	i++;
+	while(hashedString[i] != '\n')
+	{
+		filename[k] = hashedString[i];		
+		i++;
+		k++;
+	}
+	filename[k] = '\0';	
+	sprintf(result,"<%s>: <%s>",filename,hash);
+
 }
