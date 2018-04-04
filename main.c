@@ -18,32 +18,34 @@
 #define MSG_SIZE 256
 #define MQ_SEND_PATHS "/mqSendPaths"
 #define MQ_RECEIVE_HASHES "/mqReceiveHashes"
+#define MQ_MAXIMUM_MESSAGES 10
+#define SHARED_MEMORY_NAME "mySharedMemory"
 
 struct mesg_buffer {
     long mesg_type;
-    char mesg_text[1024];
+    char mesg_text[MSG_SIZE * MQ_MAXIMUM_MESSAGES];
     int count;
 } message;
 
 int main(int argc, char **argv)
 {
-    if (argc != 2) {
+    if (argc != 2)
+    {
         fprintf(stderr, "Usage: %s <PATH>\n", argv[0]);
         exit(EXIT_FAILURE);
     } 
 
     struct stat fileStat;
-
-    if(stat(argv[1], &fileStat) < 0) {
+    if(stat(argv[1], &fileStat) < 0)
+    {
         printf("Error in the file\n");
         return 1;
     }
 
-    // MESSAGE QUEUE
     struct mq_attr attr;
     mqd_t mqSendPaths, mqReceiveHashes;
 
-    attr.mq_maxmsg = 10;
+    attr.mq_maxmsg = MQ_MAXIMUM_MESSAGES;
     attr.mq_msgsize = MSG_SIZE;
     attr.mq_flags = O_NONBLOCK;
 
@@ -64,28 +66,12 @@ int main(int argc, char **argv)
             perror ("mq_send()");
     }
 
-    // SHARED MEMORY
-
-    /* the size (in bytes) of shared memory object */
-    const int sharedMemorySize = 4096;
- 
-    /* name of the shared memory object */
-    // LU/CONY/FEDE CAMBIAR ESTE NOMBRE
-    const char* name = "OS";
- 
-    /* shared memory file descriptor */
+    const int sharedMemorySize = MSG_SIZE * MQ_MAXIMUM_MESSAGES;
+    const char* name = SHARED_MEMORY_NAME;
     int shm_fd;
- 
-    /* pointer to shared memory obect */    
     void* ptr;
- 
-    /* create the shared memory object */
     shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
- 
-    /* configure the size of the shared memory object */
     ftruncate(shm_fd, sharedMemorySize);
- 
-    /* memory map the shared memory object */
     ptr = mmap(0, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
     char viewReadName[64], viewEndName[64];
@@ -103,7 +89,6 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    // CHILDRENS
     pid_t childsPID[CHILD_PROCESSES];
     int i;
 
@@ -118,7 +103,6 @@ int main(int argc, char **argv)
 
         if (childsPID[i] == 0)
         {
-            /* CHILDRENS */
             mqSendPaths = mq_open(MQ_SEND_PATHS, O_RDONLY | O_NONBLOCK | O_CREAT, 0666);
             if(mqSendPaths == -1)
             {
@@ -158,8 +142,6 @@ int main(int argc, char **argv)
         }
         else
         {
-            /* FATHER */
-
             char internalBuffer[MSG_SIZE * 10];
             mqReceiveHashes = mq_open(MQ_RECEIVE_HASHES, O_RDONLY | O_CREAT, 0666, &attr);
             if(mqReceiveHashes == -1)
@@ -191,20 +173,13 @@ int main(int argc, char **argv)
                 totalPaths--;
             } while(!mqReceiveHashesQueueEmpty && totalPaths);
 
-            strcat(ptr,"E");
-            printf("My pid is %d\n",getpid());
-            printf("Run the view process: Usage ./view PID\n");
+            strcat(ptr,"\0");
+            sem_post(viewRead);
+
+            printf("Waiting 15 seconds for you to execute the view\n");
+            printf("./view %i\n", getpid());
+            sleep(15);
             
-            struct timespec ts;
-            if(clock_gettime(CLOCK_REALTIME, &ts) != -1)
-            {
-                ts.tv_sec += 15;
-                sem_timedwait(viewEnd,&ts);
-            }
-            else
-            {
-                sleep(10);
-            }
             if(appendStringToFile(internalBuffer) == 0)
             {
                 perror("Error while writing the hashes in the file hashes.txt");
@@ -227,6 +202,5 @@ int main(int argc, char **argv)
             sem_unlink(viewEndName);
         }
     }
-
     return 0;
 }

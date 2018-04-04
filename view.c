@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <semaphore.h>
 
+#define SHARED_MEMORY_NAME "mySharedMemory"
 
 void viewProcess(char* mainPid)
 {
@@ -31,7 +32,7 @@ void viewProcess(char* mainPid)
  
     /* name of the shared memory object */
 	// LU/CONY/FEDE CAMBIAR ESTE NOMBRE
-    const char* name = "OS";
+    const char* name = SHARED_MEMORY_NAME;
  
     /* shared memory file descriptor */
     int shm_fd;
