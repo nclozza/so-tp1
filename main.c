@@ -179,10 +179,8 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    int hashReceivedLength = strlen(hashReceived);
-                    printf("%s\n",hashReceived );
-                    strcat(internalBuffer, hashReceived);
-                    strcat(internalBuffer, "\n");
+                    int hashReceivedLength = strlen(hashReceived);                    
+                    strcat(internalBuffer, hashReceived);                    
                     sprintf(ptr, "%s", hashReceived);
                     strcat(ptr, "\n");
                     ptr += hashReceivedLength;
@@ -191,7 +189,8 @@ int main(int argc, char **argv)
                 totalPaths--;
             } while(!mqReceiveHashesQueueEmpty && totalPaths);
 
-            strcat(ptr,"E");
+            strcat(ptr,"\0");
+            sem_post(viewRead);
             printf("My pid is %d\n",getpid());
             printf("Run the view process: Usage ./view PID\n");
             
