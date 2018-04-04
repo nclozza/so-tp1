@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <fcnt1.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>
 #include <sys/mman.h>
@@ -59,7 +59,7 @@ void viewProcess(char* requestedPid)
 		return;
 	}
 	munmap(sharedMem,sb.st_size);
-	close(fd);
+	//close(fd);
 
 	sem_post(semCanEnd);
 	int closedEnd = sem_close(semCanEnd);
