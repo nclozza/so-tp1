@@ -99,20 +99,21 @@ int main(int argc, char **argv)
                 printf("Error opening the Message Queue descriptor\n");
             }
             
-            char buf[MSG_SIZE];
+            char pathToBeHashed[MSG_SIZE];
+            char* pathHashed;
             int queueIsEmpty = 0;
 
             do
             {
-                mq_receive(mqSendPaths, buf, MSG_SIZE, NULL);
+                mq_receive(mqSendPaths, pathToBeHashed, MSG_SIZE, NULL);
                 if(errno == EAGAIN)
                 {
                     queueIsEmpty = 1;
                 }
                 else
                 {
-                    printf("Recibiendo %s\n", buf);
-                    int result = mq_send(mqReceiveHashes, buf, MSG_SIZE, 0);
+                    pathHashed = hash(pathToBeHashed);
+                    int result = mq_send(mqReceiveHashes, pathHashed, MSG_SIZE, 0);
                     if (result == -1)
                         perror ("mq_send()");
                 }
@@ -147,7 +148,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            printf("PADRE %s\n", hashReceived);
+            printf("%s\n", hashReceived);
         }
         totalPaths--;
     } while(!mqReceiveHashesQueueEmpty && totalPaths);

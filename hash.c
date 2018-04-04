@@ -39,13 +39,6 @@ char * format(char* hashedString)
 		k++;
 	}
 	filename[k] = '\0';	
-	sprintf(formatedString,"<%s>: <%s>",filename,hash);
+	sprintf(formatedString,"<%s> : <%s>",filename,hash);
 	return formatedString;
-}
-
-int main(int argc, char const *argv[])
-{
-	char * result = hash("README.md");
-	printf("%s\n",result );
-	return 0;
 }
