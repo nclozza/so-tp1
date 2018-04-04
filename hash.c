@@ -2,9 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
-void format(char* hashedString, char* result);
-
-char* hash(char* stringToHash, char* result)
+char* format(char* hashedString);
+char* hash(char* stringToHash)
 {
 	char command[256];
 	sprintf(command, "md5sum %s", stringToHash);
@@ -12,17 +11,17 @@ char* hash(char* stringToHash, char* result)
 	if(hashedFile == NULL)
 		return NULL;
 
-	char* hashedString = fgets(result, 512, hashedFile); 
+	char * result = malloc(512);
+	fgets(result, 512, hashedFile); 
 	pclose(hashedFile);
-	format(hashedString,result);
-	
-	return hashedString;
+	return format(result);
 }
 
-void format(char* hashedString,char* result)
+char * format(char* hashedString)
 {
 	
 	char filename[512], hash[512];
+	char* formatedString = malloc(1024);
 	int i = 0, j = 0, k = 0;	
 	while(hashedString[i] != ' ')
 	{
@@ -40,6 +39,13 @@ void format(char* hashedString,char* result)
 		k++;
 	}
 	filename[k] = '\0';	
-	sprintf(result,"<%s>: <%s>",filename,hash);
+	sprintf(formatedString,"<%s>: <%s>",filename,hash);
+	return formatedString;
+}
 
+int main(int argc, char const *argv[])
+{
+	char * result = hash("README.md");
+	printf("%s\n",result );
+	return 0;
 }
