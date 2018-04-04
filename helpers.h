@@ -10,6 +10,5 @@ typedef enum {
 
 str2int_errno str2int(int* out, char* s);
 char* concat(const char* s1, const char* s2);
-void ftruncate(int shm_fd, const int sharedMemorySize);
 
 #endif
