@@ -42,7 +42,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // MESSAGE QUEUE
     struct mq_attr attr;
     mqd_t mqSendPaths, mqReceiveHashes;
 
@@ -70,17 +69,9 @@ int main(int argc, char **argv)
     const int sharedMemorySize = MSG_SIZE * MQ_MAXIMUM_MESSAGES;
     const char* name = SHARED_MEMORY_NAME;
     int shm_fd;
- 
-    /* pointer to shared memory obect */    
     void* ptr;
- 
-    /* create the shared memory object */
     shm_fd = shm_open(name, O_CREAT | O_RDWR, 0666);
- 
-    /* configure the size of the shared memory object */
     ftruncate(shm_fd, sharedMemorySize);
- 
-    /* memory map the shared memory object */
     ptr = mmap(0, sharedMemorySize, PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
     char viewReadName[64], viewEndName[64];
@@ -98,7 +89,6 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    // CHILDRENS
     pid_t childsPID[CHILD_PROCESSES];
     int i;
 
@@ -113,7 +103,6 @@ int main(int argc, char **argv)
 
         if (childsPID[i] == 0)
         {
-            /* CHILDRENS */
             mqSendPaths = mq_open(MQ_SEND_PATHS, O_RDONLY | O_NONBLOCK | O_CREAT, 0666);
             if(mqSendPaths == -1)
             {
@@ -153,8 +142,6 @@ int main(int argc, char **argv)
         }
         else
         {
-            /* FATHER */
-
             char internalBuffer[MSG_SIZE * 10];
             mqReceiveHashes = mq_open(MQ_RECEIVE_HASHES, O_RDONLY | O_CREAT, 0666, &attr);
             if(mqReceiveHashes == -1)
