@@ -8,7 +8,6 @@
 #include <mqueue.h>
 #include <sys/stat.h>
 #include "queue.h"
-#include "helpers.h"
 #include "hash.h"
 #include "appendStringToFile.h"
 #include <time.h>
