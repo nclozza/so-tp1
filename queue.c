@@ -56,6 +56,7 @@ void saveQueue(char * dir)
             strcat(node,bar);
             strcat(node,dirEntry->d_name);
             enqueue(node);
+            free(node);
         }
         if(dirEntry->d_type == 4 && strcmp(dirEntry->d_name,".") != 0 && strcmp(dirEntry->d_name,"..") != 0){
             strcpy(path,dir);
