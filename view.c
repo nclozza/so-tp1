@@ -54,9 +54,9 @@ void viewProcess(char* mainPid)
     /* read from the shared memory object */
     char* c = (char*)ptr;
     
-    while(*c != 'E')
+    while(*c != '\0')
     {
-    	sem_wait(semRead);    
+    	sem_wait(semRead);       	
     	while(*c != '\n')
     	{
     		printf("%c", *c);
