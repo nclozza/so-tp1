@@ -162,9 +162,9 @@ int main(int argc, char **argv)
                 else
                 {
                     int hashReceivedLength = strlen(hashReceived);
-                    printf("%s\n",hashReceived );
                     strcat(internalBuffer, hashReceived);
                     strcat(internalBuffer, "\n");
+
                     sprintf(ptr, "%s", hashReceived);
                     strcat(ptr, "\n");
                     ptr += hashReceivedLength;
